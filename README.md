@@ -24,7 +24,7 @@
 Install Oque with a single command. This will download the latest version from GitHub, install dependencies (`tqdm`, `requests`, `yt-dlp`), and set up the `oque` command.
 
 ```bash
-curl -sL https://raw.githubusercontent.com/SunSolsticeByte/oque/main/install.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/SunSolsticeByte/oque/main/install.sh | sudo bash install.sh
 
 ```
 
