@@ -10,6 +10,8 @@ import urllib3
 import http.server
 import socketserver
 from urllib.parse import urlparse, quote
+import socketserver
+from socketserver import ThreadingMixIn
 
 # --- Config & Setup ---
 VERSION = "RLS25.12.27"
@@ -67,6 +69,9 @@ def get_local_ip():
         s.close()
     return IP
 
+class ThreadedTCPServer(ThreadingMixIn, socketserver.TCPServer):
+    daemon_threads = True # Allows the server to exit instantly on Ctrl+C
+
 def start_share_server(directory, specific_file=None):
     if not os.path.exists(directory):
         print(f"Error: Directory {directory} does not exist.")
@@ -76,8 +81,11 @@ def start_share_server(directory, specific_file=None):
     port = 8000
     ip = get_local_ip()
     
+    # Find a free port
     while True:
         try:
+            # Allow address reuse so you can restart the server quickly
+            socketserver.TCPServer.allow_reuse_address = True
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.bind(("", port))
             break
@@ -85,7 +93,7 @@ def start_share_server(directory, specific_file=None):
             port += 1
 
     print("\n" + "="*40)
-    print(f" SHARED SERVER STARTED")
+    print(f" SHARED SERVER STARTED (Multi-Threaded)")
     print("="*40)
     print(f" Root Folder: {directory}")
     
@@ -93,7 +101,7 @@ def start_share_server(directory, specific_file=None):
     print(f" Folder Link: {base_link}")
     
     if specific_file:
-        # Generate a direct clickable link for the specific file (handles spaces/%20)
+        from urllib.parse import quote
         safe_name = quote(specific_file)
         print(f" Direct File: {base_link}{safe_name}")
         
@@ -104,7 +112,8 @@ def start_share_server(directory, specific_file=None):
         def log_message(self, format, *args): pass
 
     try:
-        with socketserver.TCPServer(("", port), QuietHandler) as httpd:
+        # Use ThreadedTCPServer instead of TCPServer
+        with ThreadedTCPServer(("", port), QuietHandler) as httpd:
             httpd.serve_forever()
     except KeyboardInterrupt:
         print("\nStopping server...")
