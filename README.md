@@ -34,6 +34,17 @@ curl -sL https://raw.githubusercontent.com/SunSolsticeByte/oque/main/install.sh 
 
 ## 🛠️ Usage Guide
 
+### 0. BASIC SHORTCUT:
+
+Shortcuts that you should know (use keyboard pls🙏)
+
+```bash
+CTRL + C > STOP THE CURRENT OQUE TERMINAL (the left over files will be deleted)
+
+```
+
+* **Saves to:** `~` (Home Directory)
+
 ### 1. Download Files (Parallel)
 
 Download multiple files simultaneously. Oque manages the queue and shows individual progress bars.
@@ -78,6 +89,7 @@ oque ytdlp <link> shared
 ```
 
 * **Sharing to:** `LOCAL NETWORK e.g: 192.168.1.13:8000 (based on your ip in LAN)`
+* **WARN:** `SHARING WILL ONLY WORK IF THE TERMINAL IS OPEN! (Ctrl + C to close)`
 
 
 
