@@ -24,7 +24,7 @@
 Install Oque with a single command. This will download the latest version from GitHub, install dependencies (`tqdm`, `requests`, `yt-dlp`), and set up the `oque` command.
 
 ```bash
-curl -sL [https://raw.githubusercontent.com/SunSolsticeByte/oque/main/install.sh](https://raw.githubusercontent.com/SunSolsticeByte/oque/main/install.sh) | sudo bash
+curl -sL https://raw.githubusercontent.com/SunSolsticeByte/oque/main/install.sh | sudo bash
 
 ```
 
@@ -39,7 +39,7 @@ curl -sL [https://raw.githubusercontent.com/SunSolsticeByte/oque/main/install.sh
 Download multiple files simultaneously. Oque manages the queue and shows individual progress bars.
 
 ```bash
-oque url [https://example.com/file1.zip](https://example.com/file1.zip) [https://example.com/file2.png](https://example.com/file2.png)
+oque url https://example.com/file1.zip
 
 ```
 
@@ -50,18 +50,18 @@ oque url [https://example.com/file1.zip](https://example.com/file1.zip) [https:/
 Paste any GitHub repository link. Oque automatically detects it, adds the correct archive suffix, and downloads the source code as a ZIP.
 
 ```bash
-oque git [https://github.com/torvalds/linux](https://github.com/torvalds/linux)
+oque git https://github.com/SunSolsticeByte/oque
 
 ```
 
-* **Saves to:** `~/linux.zip`
+* **Saves to:** `~/oque.zip`
 
 ### 3. Download Video/Audio
 
 Uses the power of `yt-dlp` to download high-quality media from YouTube and other sites.
 
 ```bash
-oque ytdlp "[https://www.youtube.com/watch?v=dQw4w9WgXcQ](https://www.youtube.com/watch?v=dQw4w9WgXcQ)"
+oque ytdlp https://youtu.be/xvFZjo5PgG0?si=7x6sgWuHdmv8koo1
 
 ```
 
