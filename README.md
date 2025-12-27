@@ -43,8 +43,6 @@ CTRL + C > STOP THE CURRENT OQUE TERMINAL (the left over files will be deleted)
 
 ```
 
-* **Saves to:** `~` (Home Directory)
-
 ### 1. Download Files (Parallel)
 
 Download multiple files simultaneously. Oque manages the queue and shows individual progress bars.
