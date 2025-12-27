@@ -114,7 +114,3 @@ Yes. We prioritize transparency:
 <div align="center">
 <sub>Made with ❤️ by SunSolsticeByte</sub>
 </div>
-
-```
-
-```
