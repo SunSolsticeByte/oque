@@ -1,4 +1,3 @@
-cat << 'EOF' > oque.py
 #!/usr/bin/env python3
 import sys
 import os
@@ -122,6 +121,7 @@ def cmd_ytdlp(link):
     
     print(f"Fetching via yt-dlp: {link}")
     # Check if yt-dlp exists
+    import shutil
     if shutil.which("yt-dlp") is None:
         print("Error: yt-dlp is not installed/found in PATH.")
         return
@@ -183,4 +183,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-EOF
