@@ -9,7 +9,7 @@ import concurrent.futures
 import urllib3
 import http.server
 import socketserver
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 
 # --- Config & Setup ---
 VERSION = "RLS25.12.27"
@@ -67,8 +67,7 @@ def get_local_ip():
         s.close()
     return IP
 
-def start_share_server(directory):
-    """Starts a simple HTTP server to share the directory."""
+def start_share_server(directory, specific_file=None):
     if not os.path.exists(directory):
         print(f"Error: Directory {directory} does not exist.")
         return
@@ -77,7 +76,6 @@ def start_share_server(directory):
     port = 8000
     ip = get_local_ip()
     
-    # Find a free port
     while True:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -89,16 +87,21 @@ def start_share_server(directory):
     print("\n" + "="*40)
     print(f" SHARED SERVER STARTED")
     print("="*40)
-    print(f" Directory: {directory}")
-    print(f" Local Link: http://{ip}:{port}/")
-    print(" Devices on your Wi-Fi/LAN can download files here.")
+    print(f" Root Folder: {directory}")
+    
+    base_link = f"http://{ip}:{port}/"
+    print(f" Folder Link: {base_link}")
+    
+    if specific_file:
+        # Generate a direct clickable link for the specific file (handles spaces/%20)
+        safe_name = quote(specific_file)
+        print(f" Direct File: {base_link}{safe_name}")
+        
     print(" Press CTRL+C to stop sharing.")
     print("="*40 + "\n")
 
-    # Quiet Handler to keep terminal clean
     class QuietHandler(http.server.SimpleHTTPRequestHandler):
-        def log_message(self, format, *args):
-            pass
+        def log_message(self, format, *args): pass
 
     try:
         with socketserver.TCPServer(("", port), QuietHandler) as httpd:
@@ -228,7 +231,15 @@ def cmd_ytdlp(args):
 def cmd_share(args):
     target = args[0] if args else "."
     target_path = os.path.abspath(target)
-    start_share_server(target_path)
+    
+    if os.path.isfile(target_path):
+        # User provided a file -> Share the parent folder + Highlight the file
+        folder = os.path.dirname(target_path)
+        filename = os.path.basename(target_path)
+        start_share_server(folder, specific_file=filename)
+    else:
+        # User provided a folder
+        start_share_server(target_path)
 
 def cmd_git(args):
     if not args: return
