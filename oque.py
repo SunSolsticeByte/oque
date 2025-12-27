@@ -1,185 +1,261 @@
 #!/usr/bin/env python3
 import sys
 import os
+import shutil
+import signal
+import socket
 import subprocess
 import concurrent.futures
 import urllib3
+import http.server
+import socketserver
 from urllib.parse import urlparse
 
 # --- Config & Setup ---
-VERSION = "Version Beta 7.12.25"
+VERSION = "RLS25.12.27"
 MAX_CONCURRENT = 4
 HOME_DIR = os.path.expanduser("~")
 DOWNLOADS_DIR = os.path.expanduser("~/Downloads")
+SHARED_DIR = os.path.expanduser("~/Oque_Shared")
 
-# Disable SSL warnings for cleaner output
+# Global list to track active files for cleanup on Ctrl+C
+ACTIVE_FILES = []
+
+# Disable SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Try importing dependencies, or exit cleanly if missing
+# Dependency Check
 try:
     import requests
     from tqdm import tqdm
 except ImportError:
-    print("Error: Missing dependencies (requests, tqdm). Please run the installer again.")
+    print("Error: Missing dependencies. Please run the installer again.")
     sys.exit(1)
+
+# --- Signal Handling (Ctrl+C) ---
+
+def signal_handler(sig, frame):
+    print("\n\n[!] Cancellation detected (Ctrl+C).")
+    print("Cleaning up temporary files...")
+    
+    # Remove incomplete files
+    for filepath in ACTIVE_FILES:
+        if os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+                print(f" - Deleted incomplete: {os.path.basename(filepath)}")
+            except OSError:
+                pass
+    
+    print("Oque stopped.")
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
 
 # --- Helper Functions ---
 
+def get_local_ip():
+    """Finds the local network IP address."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # Doesn't actually connect, just determines route
+        s.connect(('10.255.255.255', 1))
+        IP = s.getsockname()[0]
+    except Exception:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
+
+def start_share_server(directory):
+    """Starts a simple HTTP server to share the directory."""
+    if not os.path.exists(directory):
+        print(f"Error: Directory {directory} does not exist.")
+        return
+
+    os.chdir(directory)
+    port = 8000
+    ip = get_local_ip()
+    
+    # Find a free port
+    while True:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(("", port))
+            break
+        except OSError:
+            port += 1
+
+    print("\n" + "="*40)
+    print(f" SHARED SERVER STARTED")
+    print("="*40)
+    print(f" Directory: {directory}")
+    print(f" Local Link: http://{ip}:{port}/")
+    print(" Devices on your Wi-Fi/LAN can download files here.")
+    print(" Press CTRL+C to stop sharing.")
+    print("="*40 + "\n")
+
+    # Quiet Handler to keep terminal clean
+    class QuietHandler(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, format, *args):
+            pass
+
+    try:
+        with socketserver.TCPServer(("", port), QuietHandler) as httpd:
+            httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("\nStopping server...")
+
 def clean_filename(url, is_git=False):
-    """Derives a filename from the URL."""
     try:
         parsed = urlparse(url)
         path = parsed.path.strip("/")
         if is_git:
-            # If it's a github repo, name it repo_name.zip
             repo_name = path.split("/")[-1]
-            if repo_name.endswith(".zip"):
-                return repo_name
-            return f"{repo_name}.zip"
-        
+            if not repo_name.endswith(".zip"): return f"{repo_name}.zip"
+            return repo_name
         name = os.path.basename(path)
         return name if name else "downloaded_file"
     except:
         return "unknown_file"
 
 def download_task(url, position, dest_folder, is_git=False):
-    """Handles a single download with a progress bar."""
-    
-    # Git Handling: Append archive link if it looks like a raw repo URL
     if is_git and not url.endswith(".zip"):
         if "github.com" in url and "/archive/" not in url:
             url = f"{url.rstrip('/')}/archive/HEAD.zip"
 
     filename = clean_filename(url, is_git)
     dest_path = os.path.join(dest_folder, filename)
+    
+    # Track file for Ctrl+C cleanup
+    ACTIVE_FILES.append(dest_path)
 
     try:
-        # verify=False fixes the SSL/Certificate errors
         response = requests.get(url, stream=True, timeout=20, verify=False)
         response.raise_for_status()
-
-        total_size = int(response.headers.get('content-length', 0))
+        total = int(response.headers.get('content-length', 0))
         
-        # Custom Bar Format: Filename | 45% | [====] | 2MB/5MB [ 500KB/s < 00:02 ]
         bar_fmt = '{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{rate_fmt} < {remaining}]'
         
-        with tqdm(total=total_size, unit='B', unit_scale=True, 
+        with tqdm(total=total, unit='B', unit_scale=True, 
                   desc=f"Downloading {filename}", position=position, leave=True, 
                   bar_format=bar_fmt) as pbar:
             with open(dest_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
+                for chunk in response.iter_content(8192):
                     if chunk:
                         pbar.update(len(chunk))
                         f.write(chunk)
         
+        # Download success, remove from active cleanup list
+        if dest_path in ACTIVE_FILES:
+            ACTIVE_FILES.remove(dest_path)
+            
         return True, dest_path, None
     except Exception as e:
+        if os.path.exists(dest_path):
+            os.remove(dest_path)
+        if dest_path in ACTIVE_FILES:
+            ACTIVE_FILES.remove(dest_path)
         return False, filename, str(e)
 
-# --- Command Handlers ---
+# --- Commands ---
 
-def cmd_url(urls):
+def cmd_url(args):
+    is_shared = False
+    urls = []
+    
+    for arg in args:
+        if arg.lower() == "shared":
+            is_shared = True
+        else:
+            urls.append(arg)
+            
     if not urls:
-        print("Usage: oque url <link1> <link2> ...")
+        print("Usage: oque url <link> [shared]")
         return
+
+    # If shared, save to dedicated folder, otherwise Home
+    dest_dir = SHARED_DIR if is_shared else HOME_DIR
+    if is_shared and not os.path.exists(SHARED_DIR):
+        os.makedirs(SHARED_DIR)
 
     print(f"Queueing {len(urls)} file(s)...")
-    
     results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT) as executor:
-        futures = [executor.submit(download_task, url, i, HOME_DIR) for i, url in enumerate(urls)]
-        
-        for future in concurrent.futures.as_completed(futures):
-            results.append(future.result())
-
-    # Summary
-    print("\n" * len(urls)) # Spacing to clear bars
-    print("-" * 40)
-    print("DOWNLOAD SUMMARY (~/):")
-    for success, name_or_path, error in results:
-        if success:
-            print(f" [OK] Saved: {name_or_path}")
-        else:
-            print(f" [X] FAILED {name_or_path}: {error}")
-
-def cmd_git(link):
-    if not link:
-        print("Usage: oque git <github_url>")
-        return
-    print("Processing Git Repository...")
-    success, path, err = download_task(link, 0, HOME_DIR, is_git=True)
-    print("\n" + "-" * 30)
-    if success:
-        print(f" [OK] Repo saved as: {path}")
-    else:
-        print(f" [X] Git Download Failed: {err}")
-
-def cmd_ytdlp(link):
-    if not link:
-        print("Usage: oque ytdlp <link>")
-        return
     
-    print(f"Fetching via yt-dlp: {link}")
-    # Check if yt-dlp exists
-    import shutil
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT) as ex:
+        futures = [ex.submit(download_task, u, i, dest_dir) for i, u in enumerate(urls)]
+        for f in concurrent.futures.as_completed(futures):
+            results.append(f.result())
+
+    print("\n" * len(urls) + "-"*40)
+    print(f"Saved to: {dest_dir}")
+    for success, path, err in results:
+        print(f" [OK] {os.path.basename(path)}" if success else f" [X] {path}: {err}")
+    
+    if is_shared:
+        start_share_server(dest_dir)
+
+def cmd_ytdlp(args):
+    if not args: return
+    
+    link = args[0]
+    is_shared = "shared" in args
+    
+    dest_dir = SHARED_DIR if is_shared else DOWNLOADS_DIR
+    if is_shared and not os.path.exists(SHARED_DIR):
+        os.makedirs(SHARED_DIR)
+
+    print(f"Fetching via yt-dlp...")
     if shutil.which("yt-dlp") is None:
-        print("Error: yt-dlp is not installed/found in PATH.")
+        print("Error: yt-dlp missing.")
         return
 
     try:
-        # Run yt-dlp silently, only showing its own progress
-        cmd = ["yt-dlp", "-P", DOWNLOADS_DIR, link]
+        cmd = ["yt-dlp", "-P", dest_dir, link]
         subprocess.run(cmd, check=True)
         print("-" * 30)
-        print(f" [OK] Media saved to: {DOWNLOADS_DIR}")
+        print(f" [OK] Media saved to: {dest_dir}")
+        
+        if is_shared:
+            start_share_server(dest_dir)
+            
     except subprocess.CalledProcessError:
-        print(f" [X] FAILED: yt-dlp could not download the link.")
+        print(" [X] FAILED: yt-dlp error.")
 
-def cmd_restart():
-    # In a script context, we just echo. 
-    # Real service restart would require systemctl access.
-    print("oque restarted.")
+def cmd_share(args):
+    target = args[0] if args else "."
+    target_path = os.path.abspath(target)
+    start_share_server(target_path)
 
-def cmd_uninstall():
-    print(f"Uninstalling {VERSION}...")
-    confirm = input("Are you sure? Type 'oque' to confirm: ")
-    if confirm.strip() == "oque":
-        try:
-            target = "/usr/local/bin/oque"
-            if os.path.exists(target):
-                os.remove(target)
-                print("Oque has been uninstalled.")
-            else:
-                print("Oque is not installed in /usr/local/bin.")
-        except PermissionError:
-            print("Error: Permission denied. Try: sudo oque uninstall")
-    else:
-        print("Cancelled.")
-
-# --- Main ---
+def cmd_git(args):
+    if not args: return
+    link = args[0]
+    print("Processing Git Repo...")
+    s, p, e = download_task(link, 0, HOME_DIR, is_git=True)
+    print("\n" + "-"*30)
+    print(f" [OK] {p}" if s else f" [X] {e}")
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: oque <url|git|ytdlp|restart|uninstall|version>")
+        print("Usage: oque <url|ytdlp|git|share|restart|uninstall|version>")
         return
 
-    command = sys.argv[1].lower()
-    import shutil # Lazy import
+    cmd = sys.argv[1].lower()
+    args = sys.argv[2:]
 
-    if command == "url":
-        cmd_url(sys.argv[2:])
-    elif command == "git":
-        cmd_git(sys.argv[2] if len(sys.argv) > 2 else None)
-    elif command == "ytdlp":
-        cmd_ytdlp(sys.argv[2] if len(sys.argv) > 2 else None)
-    elif command == "restart":
-        cmd_restart()
-    elif command == "uninstall":
-        cmd_uninstall()
-    elif command == "version":
-        print(VERSION)
+    if cmd == "url": cmd_url(args)
+    elif cmd == "ytdlp": cmd_ytdlp(args)
+    elif cmd == "git": cmd_git(args)
+    elif cmd == "share": cmd_share(args)
+    elif cmd == "version": print(VERSION)
+    elif cmd == "restart": print("oque restarted.")
+    elif cmd == "uninstall":
+        if input("Type 'oque' to confirm uninstall: ") == "oque":
+            try: os.remove("/usr/local/bin/oque")
+            except: print("Use sudo.")
+            else: print("Uninstalled.")
     else:
-        print(f"Unknown command: {command}")
+        print(f"Unknown command: {cmd}")
 
 if __name__ == "__main__":
     main()
