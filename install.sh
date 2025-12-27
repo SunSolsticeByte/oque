@@ -1,3 +1,4 @@
+cat << 'EOF' > install.sh
 #!/usr/bin/env bash
 
 # Config
@@ -15,7 +16,7 @@ if ! python3 -m pip install requests tqdm yt-dlp --break-system-packages > /dev/
 fi
 
 # 2. Download the Source Code
-echo "Downloading core logic..."
+echo "Downloading core logic from GitHub..."
 curl -sL "$SOURCE_URL" -o "oque_temp.py"
 
 # 3. Install
@@ -28,6 +29,7 @@ if [ -s "oque_temp.py" ]; then
     echo "Type 'oque version' to verify."
 else
     echo "Error: Failed to download oque.py from GitHub."
-    echo "Check your internet or if the file exists in the repo."
+    echo "Check your internet or if the 'oque.py' file exists in the repo."
     rm -f "oque_temp.py"
 fi
+EOF
