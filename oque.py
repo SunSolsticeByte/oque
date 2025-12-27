@@ -122,6 +122,9 @@ def clean_filename(url, is_git=False):
 def download_task(url, position, dest_folder, is_git=False):
     if is_git and not url.endswith(".zip"):
         if "github.com" in url and "/archive/" not in url:
+            # FIX: Remove .git suffix if present
+            if url.endswith(".git"):
+                url = url[:-4]
             url = f"{url.rstrip('/')}/archive/HEAD.zip"
 
     filename = clean_filename(url, is_git)
