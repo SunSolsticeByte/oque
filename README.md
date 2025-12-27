@@ -39,7 +39,7 @@ curl -sL https://raw.githubusercontent.com/SunSolsticeByte/oque/main/install.sh 
 Download multiple files simultaneously. Oque manages the queue and shows individual progress bars.
 
 ```bash
-oque url https://example.com/file1.zip
+oque url <Download link> <Download link 2 optional> <etc>
 
 ```
 
@@ -50,24 +50,38 @@ oque url https://example.com/file1.zip
 Paste any GitHub repository link. Oque automatically detects it, adds the correct archive suffix, and downloads the source code as a ZIP.
 
 ```bash
-oque git https://github.com/SunSolsticeByte/oque
+oque git <Github HTTPS Repo link>
 
 ```
 
-* **Saves to:** `~/oque.zip`
+* **Saves to:** `~/<RepoName>.zip`
 
 ### 3. Download Video/Audio
 
 Uses the power of `yt-dlp` to download high-quality media from YouTube and other sites.
 
 ```bash
-oque ytdlp https://youtu.be/xvFZjo5PgG0?si=7x6sgWuHdmv8koo1
+oque ytdlp <link>
 
 ```
 
 * **Saves to:** `~/Downloads`
 
-### 4. System Commands
+### 4. Instant Sharing
+
+Uses the power of `HTTP` to 'Share any files with no limit!'
+
+```bash
+oque share <Path>
+oque url <Link> shared
+oque ytdlp <link> shared
+```
+
+* **Sharing to:** `LOCAL NETWORK e.g: 192.168.1.13:8000 (based on your ip in LAN)`
+
+
+
+### 5. System Commands
 
 ```bash
 # Check installed version
