@@ -87,7 +87,7 @@ oque ytdlp <link> shared
 ```
 
 * **Sharing to:** `LOCAL NETWORK e.g: 192.168.1.13:8000 (based on your ip in LAN)`
-* **WARN:** `SHARING WILL ONLY WORK IF THE TERMINAL IS OPEN! (Ctrl + C to close)`
+* **WARN:** `SHARING WILL ONLY WORK IF THE TERMINAL IS OPEN! (Ctrl + C to close). if you were having issues for oque share <path> then use " at the start and the end of the file name e.g: oque share "rick and (roll).mp4"`
 
 
 
